@@ -78,7 +78,7 @@ if __name__ == "__main__":
     df = generate_student_data()
 
     # Save to a CSV file
-    output_filename = "dataset_siswa_test.csv"
+    output_filename = "dataset_siswa_training.csv"
     df.to_csv(output_filename, index=False)
 
     print(f"✅ Done! Data successfully saved to file: {output_filename}")
