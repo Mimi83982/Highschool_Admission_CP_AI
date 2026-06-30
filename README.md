@@ -77,8 +77,8 @@ Start the Flask server:
 
 ```bash
 python generate_data.py
-train_model.py
-train_forecaster.py
+python train_model.py
+python train_forecaster.py
 python app.py
 ```
 
