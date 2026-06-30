@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Academic Profile</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: 'Nunito', sans-serif; background: linear-gradient(135deg, #FFF1E6 0%, #FFDFD3 100%); min-height: 100vh; color: #4a4a4a; padding: 40px 0 20px; }
+        .cozy-card { background: rgba(255, 255, 255, 0.95); border-radius: 24px; border: none; box-shadow: 0 12px 36px rgba(253, 160, 133, 0.15); padding: 30px; margin-bottom: 25px; }
+        h4 { font-weight: 800; color: #d97b66; }
+        .btn-back { background: transparent; color: #d97b66; font-weight: 700; border: 2px solid #fda085; border-radius: 12px; padding: 8px 20px; transition: 0.3s; cursor: pointer; }
+        .btn-back:hover { background: #fda085; color: white; }
+        .avatar-box { width: 100px; height: 100px; background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: white; margin: 0 auto 15px; }
+        .badge-eligible { background-color: #d4edda; color: #155724; padding: 8px 14px; border-radius: 8px; font-weight: 700; }
+        .badge-rejected { background-color: #f8d7da; color: #721c24; padding: 8px 14px; border-radius: 8px; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="mb-4">
+        <button type="button" class="btn-back" onclick="history.back()">
+            <i class="fa-solid fa-arrow-left"></i> Back to Rankings
+        </button>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="cozy-card text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                <div class="avatar-box mb-4" style="width: 120px; height: 120px; font-size: 3.5rem;">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+                <h4 id="lbl-name" class="mb-1 fs-3">Loading...</h4>
+                <p id="lbl-id" class="text-muted mb-3 fs-5">ID: --</p>
+                <div class="mb-4" id="lbl-status">--</div>
+
+                <div class="w-100 mt-auto pt-3">
+                    <hr class="w-75 mx-auto mb-4" style="border-color: #fda085;">
+                    <h6 class="fw-bold text-muted text-uppercase tracking-wide mb-2">Admission Index</h6>
+                    <h3 id="lbl-avg" style="color: #fda085; font-weight: 800; font-size: 4rem; line-height: 1;">00.0</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="cozy-card">
+                <h4><i class="fa-solid fa-chart-pie text-primary"></i> Current Statistics — Middle School (Sem 1–6)</h4>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-5">
+                        <p class="text-muted small mb-1 fw-bold">Subject Proficiency (Sem 6)</p>
+                        <div style="height: 260px;"><canvas id="radarStatChart"></canvas></div>
+                    </div>
+                    <div class="col-md-7">
+                        <p class="text-muted small mb-1 fw-bold">Average Score Trend (Sem 1–6)</p>
+                        <div style="height: 260px;"><canvas id="historyLineChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cozy-card mb-0">
+                <h4><i class="fa-solid fa-chart-line text-success"></i> Deep Learning Prediction — High School (Sem 1–6)</h4>
+                <div id="prediction-loading" class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+                    Fetching AI prediction...
+                </div>
+                <div style="height: 260px; display:none;" id="prediction-wrap">
+                    <canvas id="studentPredictionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentId = urlParams.get('id');
+
+        const students = JSON.parse(localStorage.getItem('studentBatchResults'));
+        const student = students ? students.find(s => s.id_siswa === studentId) : null;
+
+        if (!student) { window.location.href = 'index.html'; return; }
+
+        document.getElementById('lbl-name').innerText = student.nama;
+        document.getElementById('lbl-id').innerText = "ID: " + student.id_siswa;
+        document.getElementById('lbl-avg').innerText = student.rata_rata_akhir;
+        document.getElementById('lbl-status').innerHTML = student.status_eligible === 1
+            ? '<span class="badge badge-eligible">Eligible</span>'
+            : '<span class="badge badge-rejected">Rejected</span>';
+
+        const subjects = ['MTK', 'B_Indo', 'B_Inggris', 'IPA', 'IPS'];
+
+        const radarData = subjects.map(s => student[`${s}_Sem6`]);
+
+        const historicalTimeline = [];
+        for (let sem = 1; sem <= 6; sem++) {
+            let avg = (student[`MTK_Sem${sem}`] + student[`B_Indo_Sem${sem}`] +
+                       student[`B_Inggris_Sem${sem}`] + student[`IPA_Sem${sem}`] + student[`IPS_Sem${sem}`]) / 5;
+            historicalTimeline.push(parseFloat(avg.toFixed(2)));
+        }
+
+        renderRadar(radarData);
+        renderHistoryLine(historicalTimeline);
+
+        fetch('http://127.0.0.1:5000/get_prediction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ semesters: historicalTimeline })
+        })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('prediction-loading').style.display = 'none';
+            document.getElementById('prediction-wrap').style.display = 'block';
+            renderPredictionLine(data.sem7, data.sem8, data.sem9, data.sem10, data.sem11, data.sem12);
+        })
+        .catch(() => {
+            document.getElementById('prediction-loading').innerHTML =
+                '<i class="fa fa-triangle-exclamation text-warning me-1"></i> Prediction server unavailable.';
+        });
+    };
+
+    function renderRadar(stats) {
+        new Chart(document.getElementById('radarStatChart'), {
+            type: 'radar',
+            data: {
+                labels: ['Math', 'Indo', 'Eng', 'Sci', 'Soc'],
+                datasets: [{
+                    label: 'Score',
+                    data: stats,
+                    backgroundColor: 'rgba(253, 160, 133, 0.4)',
+                    borderColor: '#fda085',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#fda085'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 100,
+                        ticks: { display: false },
+                        grid: { color: 'rgba(200,180,170,0.25)' },
+                        angleLines: { color: 'rgba(200,180,170,0.3)' },
+                        pointLabels: { font: { size: 11, weight: '700', family: 'Nunito' }, color: '#a07060' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function renderHistoryLine(hist) {
+        new Chart(document.getElementById('historyLineChart'), {
+            type: 'line',
+            data: {
+                labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6'],
+                datasets: [{
+                    label: 'Average',
+                    data: hist,
+                    borderColor: '#fda085',
+                    backgroundColor: 'rgba(253,160,133,0.12)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fda085',
+                    pointRadius: 5,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: { display: false },
+                        grid: { display: false },
+                        border: { display: false }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Nunito', weight: '700' }, color: '#a07060' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function renderPredictionLine(p7, p8, p9, p10, p11, p12) {
+        new Chart(document.getElementById('studentPredictionChart'), {
+            type: 'line',
+            data: {
+                labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6'],
+                datasets: [{
+                    label: 'High School Prediction',
+                    data: [p7, p8, p9, p10, p11, p12],
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25,135,84,0.10)',
+                    borderDash: [6, 4],
+                    borderWidth: 3,
+                    pointBackgroundColor: '#198754',
+                    pointRadius: 5,
+                    tension: 0.3,
+                    fill: true,
+                    spanGaps: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: { display: false },
+                        grid: { display: false },
+                        border: { display: false }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Nunito', weight: '700' }, color: '#3a7a5a' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+</script>
+</body>
+</html>

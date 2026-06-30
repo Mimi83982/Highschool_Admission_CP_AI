@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Admission Portal - Home</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #FFF1E6 0%, #FFDFD3 100%);
+            min-height: 100vh;
+            color: #4a4a4a;
+            padding: 40px 0;
+        }
+        .cozy-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            border: none;
+            box-shadow: 0 12px 36px rgba(253, 160, 133, 0.15);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        h2, h4 { font-weight: 800; color: #d97b66; }
+
+        #drop-zone {
+            border: 3px dashed #fda085;
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #fffaf7;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #drop-zone:hover, #drop-zone.dragover {
+            background-color: #ffe8e0;
+            border-color: #f6d365;
+        }
+        .upload-icon { font-size: 3rem; color: #fda085; margin-bottom: 10px; }
+
+        .btn-sunny {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: white; font-weight: 700; border: none; border-radius: 12px;
+            padding: 8px 20px; transition: 0.3s;
+        }
+        .btn-sunny:hover { color: white; box-shadow: 0 4px 15px rgba(253, 160, 133, 0.4); transform: translateY(-2px); }
+
+        .badge-eligible { background-color: #d4edda; color: #155724; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+        .badge-rejected { background-color: #f8d7da; color: #721c24; padding: 6px 12px; border-radius: 8px; font-weight: 700; }
+
+        .table thead th { background-color: #fff4ef; color: #d97b66; border-bottom: 2px solid #fda085; font-weight: 800; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="text-center mb-4">
+        <h2><i class="fa-solid fa-graduation-cap"></i> AI Admission Portal</h2>
+        <p class="text-muted">High School Selection Dashboard</p>
+    </div>
+
+    <div class="cozy-card">
+        <h4><i class="fa-solid fa-file-csv text-warning"></i> Upload Student Batch Data</h4>
+        <p class="text-muted small">Drop your student data CSV file below to run the Backpropagation ranking algorithm.</p>
+
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+            <h5>Drag & Drop your CSV file here</h5>
+            <p class="text-muted mb-0">or click to browse your files</p>
+            <input type="file" id="file-input" class="hidden" accept=".csv" onchange="handleFile(this.files[0])">
+        </div>
+
+        <div id="loading" class="text-center hidden mt-3">
+            <div class="spinner-border text-warning" role="status"></div>
+            <p class="mt-2 fw-bold text-muted">AI Neural Network is evaluating applicants...</p>
+        </div>
+    </div>
+
+    <div class="cozy-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+            <h4 class="mb-0"><i class="fa-solid fa-list-ol text-danger"></i> Applicant Standings</h4>
+            <div class="d-flex gap-2">
+                <input type="text" id="search-bar" class="form-control" placeholder="Search name or ID..." onkeyup="searchTable()" style="border-radius: 12px; border: 2px solid #ffe8e0; width: 220px;">
+                <button class="btn btn-outline-danger fw-bold" style="border-radius: 12px;" onclick="clearData()">
+                    <i class="fa-solid fa-trash-can"></i> Clear
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Final Average</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr id="placeholder-row">
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-folder-open d-block fs-3 mb-2"></i> No data uploaded yet. Drag a CSV above to populate ranks.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    let globalStudentData = [];
+
+    window.onload = function() {
+        const cachedData = localStorage.getItem('studentBatchResults');
+        if (cachedData) {
+            globalStudentData = JSON.parse(cachedData);
+            renderTable(globalStudentData);
+        }
+    };
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+        if (!file.name.endsWith('.csv')) { alert("Please upload a valid CSV file!"); return; }
+
+        document.getElementById('drop-zone').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('http://127.0.0.1:5000/process_csv', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('drop-zone').classList.remove('hidden');
+
+            if (data.status === 'success') {
+                globalStudentData = data.data;
+                localStorage.setItem('studentBatchResults', JSON.stringify(globalStudentData));
+                renderTable(globalStudentData);
+            } else {
+                alert("Error: " + data.error);
+            }
+        })
+        .catch(error => {
+            alert("Failed to connect to the Flask server!");
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('drop-zone').classList.remove('hidden');
+        });
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+
+        if(data.length === 0) {
+            tbody.innerHTML = `<tr id="placeholder-row"><td colspan="6" class="text-center py-4 text-muted">No matching records found.</td></tr>`;
+            return;
+        }
+
+        data.forEach((student, index) => {
+            const statusBadge = student.status_eligible === 1
+                ? '<span class="badge badge-eligible"><i class="fa-solid fa-circle-check"></i> Eligible</span>'
+                : '<span class="badge badge-rejected"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>';
+
+            const row = `
+                <tr>
+                    <td><strong>#${index + 1}</strong></td>
+                    <td class="text-muted">${student.id_siswa}</td>
+                    <td class="fw-bold">${student.nama}</td>
+                    <td>${student.rata_rata_akhir}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn-sunny" onclick="goToProfile('${student.id_siswa}')">
+                            View Profile <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function searchTable() {
+        const query = document.getElementById('search-bar').value.toLowerCase();
+        const filteredData = globalStudentData.filter(student =>
+            student.nama.toLowerCase().includes(query) || student.id_siswa.toLowerCase().includes(query)
+        );
+        renderTable(filteredData);
+    }
+
+    function clearData() {
+        if (confirm("Are you sure you want to clear all uploaded data?")) {
+            localStorage.removeItem('studentBatchResults');
+            globalStudentData = [];
+            document.getElementById('table-body').innerHTML = `
+                <tr id="placeholder-row">
+                    <td colspan="6" class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-folder-open d-block fs-3 mb-2"></i> No data uploaded yet. Drag a CSV above to populate ranks.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function goToProfile(id_siswa) {
+        window.location.href = `profile.html?id=${id_siswa}`;
+    }
+</script>
+</body>
+</html>
